@@ -1,0 +1,585 @@
+---
+title: "PEC1"
+author: "Erika Martínez"
+date: "`r format(Sys.Date(),"%e de %B, %Y")`"
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1.Lectura de datos y examinación del tipo de variable
+
+## 1.1. Cargar el archivo de datos
+
+Cargamos las librerías necesarias. 
+
+```{r libraries, warning=FALSE, message=FALSE}
+library(stringr)
+
+# Cargar el paquete ggplot2
+library(ggplot2)
+
+# Instalar y cargar el paquete reshape2
+# install.packages("reshape2")
+library(reshape2)
+
+#install.packages("ranger")
+#install.packages("VIM")
+library(VIM)
+
+# Cargamos el paquete dplyr
+library(dplyr)
+
+#install.packages("robustbase")
+library(robustbase)
+
+#Cargamos el paquete knitr para hacer tablas
+library(knitr)
+```
+
+
+Cargamos el archivo .csv
+
+```{r read}
+#Leer el fichero Happiness.csv
+happiness <- read.csv("Happiness.csv")
+
+#Observar los primeros valores del dataframe happiness.
+head(happiness)
+```
+## 1.2. Examinar el tipo de datos
+
+```{r}
+#Observar la estructura del fichero "happiness".
+str(happiness) 
+```
+Vemos que existen 157 observaciones y 12 variables.
+
+De entre las 12 variables, 4 son de tipo "character", 7 son de tipo "numeric" y 1 es de tipo "integer". 
+
+Dos de las variables parecen estar categorizadas en un tipo de datos equivocado. *Happiness.Score* tiene valores numéricos, sin embargo estos son caractéres. De igual manera, esto sucede con la variable *GDP.per.Capita*. 
+
+```{r}
+#Obtener el tipo de datos de cada variable.
+ sapply(happiness, class)
+```
+Previamente, la información del dataframe nos indica que existen 157 observaciones. Sin embargo, es importante comprobar que no hay filas repetidas. En este caso comprobamos que no haya países repetidos. 
+
+```{r}
+#Obtenemos el numero de valores unicos de la variable Country, la cual contiene los países.
+length(unique(happiness$Country))
+```
+
+Podemos observar que, en efecto, existen 157 países diferentes.
+
+
+# 2. Normalización de las variables cuantitativa
+
+## 2.1. Cambiar el nombre de las variables
+
+```{r}
+# Cambiamos los nombres de la variables Happiness.Rank, Happiness.Score, GDP.por.Capita, Life.Expectancy, Government.Corruption, Lower.Confidence.Interval y Upper.Confidence.Interval.
+
+names(happiness)[names(happiness) == "Happiness.Rank"] <- "HR"
+names(happiness)[names(happiness) == "Happiness.Score"] <- "HS"
+names(happiness)[names(happiness) == "GDP.per.Capita"] <- "GpC"
+names(happiness)[names(happiness) == "Life.Expectancy"] <- "LE"
+names(happiness)[names(happiness) == "Government.Corruption"] <- "GC"
+names(happiness)[names(happiness) == "Lower.Confidence.Interval"] <- "LCI"
+names(happiness)[names(happiness) == "Upper.Confidence.Interval"] <- "UCI"
+
+print(names(happiness))
+```
+
+## 2.2. Variables HS, GpC y Freedom
+
+### Variable HS (Happiness.Score)
+
+```{r}
+# Variable HS (Happiness.Score)
+
+# Cambiamos el tipo de variable de "character" to "numeric".
+happiness$HS <- as.numeric(happiness$HS)
+
+# Obtenemos un resumen de los datos numéricos, incluye los NAs
+summary(happiness$HS)
+
+# Revisamos los países que tienen valores nulos en la columna HS. 
+happiness[, c("Country", "HS")][is.na(happiness$HS),]
+
+```
+
+
+### Variable GpC (GDP.per.Capita)
+
+```{r}
+# Variable GpC (GDP.per.Capita)
+
+# Vemos los valores de la variable GpC.
+head(happiness[, c("Country", "GpC")], 10)
+
+```
+Vemos que existe inconsistencias en los valores, la mayoría están alrededor de 1.0 mientras que países como New Zealand tiene 136,066. Notamos que casi todos los números tienen 6 dígitos, así que decidimos borrar las comas y puntos. Después agregamos un punto después del primer dígito, así los valores van del 0 al 1.8. Sin embargo, no sabemos las unidades de esta variable y que representa exactamente.
+
+```{r}
+# Eliminamos las comas y puntos de los valores de GpC
+happiness$GpC <- gsub(",", "", happiness$GpC)
+happiness$GpC <- gsub("\\.", "", happiness$GpC)
+
+# Agregamos un punto después del primer número de GpC
+happiness$GpC <- gsub("^(.{1})", "\\1.", happiness$GpC)
+
+# Obtenemos el valor máximo y mínimo de la variable GpC.
+min(happiness$GpC)
+max(happiness$GpC)
+
+# Revisamos la variable GpC
+head(happiness[, c(1,7)])
+```
+
+El paso final es pasar la variable GpC de tipo de datos "character" a "numeric". 
+
+```{r}
+# Convertimos la variable GpC de "character" a "numeric".
+happiness$GpC <- as.numeric(happiness$GpC)
+
+class(happiness$GpC)
+
+summary(happiness$GpC)
+```
+
+
+### Variable Freedom
+
+```{r}
+# Variable Freedom
+
+head(happiness$Freedom)
+
+```
+
+```{r}
+# Variable Freedom
+
+# Revisamos la clase de la variable Freedom.
+class(happiness$Freedom)
+
+# Revisamos un resumen de los valores importantes de la variable Freedom
+summary(happiness$Freedom)
+
+#Revisamos cuantos valores son NA.
+sum(is.na(happiness$Freedom))
+
+```
+Vemos que la variable Freedom tiene el tipo adecuado y que no existen valores NA. Así que no parece que necesita acciones adicionales por el momento.
+
+
+# 3. Normalización de las variables cualitativas
+
+## 3.1. Revisad la variable Country
+
+```{r}
+head(happiness$Country, 10)
+```
+Vemos que existen varios errores de formato en los valores de la variable Country. Existen vacíos al principio o al final del país y la primera letra de cada palabra no está en mayúscula. 
+
+```{r}
+#Eliminar los espacios de delante y despues de cada valor de la variable
+happiness$Country <- sapply(happiness$Country, trimws)
+
+#Colocamos la primera letra en mayúscula. 
+happiness$Country <- sapply(happiness$Country, str_to_title)
+
+#Observar los primero y últimos valores de la variable
+head(happiness$Country, 10)
+```
+
+## 3.2. Revisar la variable Region
+
+```{r}
+# Vemos las diferentes categorías de la variable Region.
+unique(happiness$Region)
+```
+Vemos que muchas categorías se repiten, pero el formato es diferente y necesita ser mejorado.
+
+```{r}
+#Eliminar los espacios de delante y despues de cada valor de la variable
+happiness$Region <- sapply(happiness$Region, trimws)
+
+#Colocamos solo la primera letra de cada palabra en mayúscula. 
+happiness$Region <- sapply(happiness$Region, str_to_title)
+
+#Observarmos las diferentes categorías
+unique(happiness$Region)
+```
+
+```{r}
+# Cambiamos el "And" por "and"
+happiness$Region <- gsub("And", "and", happiness$Region)
+
+# Dejamos solo un espacio en blanco entre las palabras
+happiness$Region <- gsub("  ", " ", happiness$Region)
+
+# Corregimos “Afrca” por “Africa”.
+happiness$Region <- gsub("Afrca", "Africa", happiness$Region)
+
+unique(happiness$Region)
+```
+Después de realizar las transformaciones oportunas, obtenemos un total de 10 categorías para la variable "Region". 
+
+
+
+# 4. Estudio de la inconsistencia entre variables
+
+## 4.1. HR vs HS
+
+```{r}
+head(happiness[, c("Country", "HR", "HS")])
+```
+
+Para crear la secuencia apropiada de HR nos basamos en los valores y orden de los valores de la columna HS. Dado que algunas filas de la columna HS son NAs, entonces debemos acomodar apropiadamente los valores de HR.
+
+
+```{r}
+# Colocamos NA en toda la columna HR
+happiness$HR <- NA_integer_
+
+#Obtenemos la posición/orden de los valores de la variable HS, ignorando los NAs
+rank_HS1 <- rank(happiness$HS, ties.method="first", na.last=NA)
+
+#Invertimos los valores de las posiciones/orden para que el mayor sea el primero y viceversa
+reversed_rank_HS1 <- length(happiness$HS[!is.na(happiness$HS)]) + 1 - rank_HS1
+
+#Colocamos los valores de las posiciones en la variable HR, ignorando los NAs
+happiness$HR[!is.na(happiness$HS)] <- reversed_rank_HS1
+
+#Imprimimos para visualizar
+head(happiness[, c("Country", "HR", "HS")], 10)
+```
+Vemos que hemos colocado los valores apropiados de HR basados en HS, ignorando los NAs. 
+
+
+## 4.2. LCI vs UCI
+
+```{r}
+# Obtenemos las filas en donde LCI es mayor a UCI
+happiness[happiness$LCI > happiness$UCI, c("Country", "HS", "LCI", "UCI")]
+
+# Para intercambiar los valores de LCI a UCI y viceversa, guardamos LCI en una variable temporal.
+temp_LCI <- happiness[happiness$LCI > happiness$UCI, "LCI"]
+
+# Colocamos los valores erroneos de UCI en la columna de LCI
+happiness[happiness$LCI > happiness$UCI, "LCI"] <- happiness[happiness$LCI > happiness$UCI, "UCI"]
+
+#Colocamos los valores erroneos de LCI, guardada en la variable temporal, en la columna UCI
+happiness[happiness$LCI > happiness$UCI, "UCI"] <- temp_LCI
+
+# Obtenemos las filas en donde LCI es mayor que UCI.
+happiness[happiness$LCI > happiness$UCI, c("Country", "HS", "LCI", "UCI")]
+
+```
+
+Como podemos observar en el primer dataframe, existen 12 filas en donde LCI es mayor que UCI. En el segundo dataframe, después de haber realizado el intercambio de valores, obtenemos 0 filas en donde los valores de LCI es mayor que UCI. Por lo tango, los valores son los adecuados en cada una de las dos variables. 
+
+
+# 5. Valores atípicos
+
+## 5.1. Revisar si hay valores atípicos en las variables HS, GC, Generosity y Family.
+
+## 5.2. Identificar los países a los que pertenecen los valores atípicos encontrados
+
+
+### Happiness Score (HS)
+
+```{r}
+#Creamos boxplots de la variable HS
+boxplot(happiness$HS, main="Boxplot of Happiness Score")
+boxplot.stats(happiness$HS)
+summary(happiness$HS)
+```
+En la variable HS, no existen outliers.
+
+
+### Government Corruption (GC)
+
+```{r}
+#Creamos boxplots de la variable GC
+boxplot(happiness$GC, main="Boxplot of Government Corruption")
+
+#Vemos los valores importantes del boxplot
+boxplot.stats(happiness$GC)
+
+#Vemos las estadísticas más importantes para complementar los valores anteriores.
+summary(happiness$GC)
+```
+En la variable GC, existen 12 outliers. No está claro si estos valores atípicos también son anómalos debido a que no sabemos el rango de valores permitidos al medir la variable "Government.Corruption". Si el rango de valores permitidos es de 0 a 1, entonces los valores atípicos NO son anómalos. Sin embargo, si el rango de valores de la variable va de 0 a 0.5, entonces si existe un valor anómalo: 0.50521.
+
+```{r}
+happiness[happiness$GC > 0.32331, c("Country", "GC")]
+```
+Podemos observar los países de los valores atípicos. El único posible valor anómalo pertenece a Rwanda. Sin embargo, decidimos mantenerlo y considerarlo como atípico pero no anómalo, porque no tenemos la información necesaria.
+
+
+### Generosity
+
+```{r}
+#Creamos boxplots de la variable Generosity
+boxplot(happiness$Generosity, main="Boxplot of Generosity")
+boxplot.stats(happiness$Generosity)
+summary(happiness$Generosity)
+```
+Según el boxplot de la variable Generosity, existen 4 valores atípicos.El valor máximo del boxplot, el bigote superior, es 0.51479. Tres de los valores atípicos están alrededor de 0.5, excepto un valor de 0.81971. Así que procedemos a revisar estos valores.
+
+```{r}
+happiness[happiness$Generosity > 0.51479, c("Country", "Generosity")]
+```
+El valor atípico de 0.81971 de la variable Generosity pertence al país de Myanmar. Si el rango de valores para esta variable está entre 0 y 1, entonces este sería atípico, pero no anómalo. Necesitamos más información sobre el dataset y la variable para determinar si este es un valor anómalo. 
+
+
+### Family 
+
+```{r}
+#Creamos boxplots de la variable Family
+boxplot(happiness$Family, main="Boxplot of Family")
+
+# Revisamos los valores del boxplot
+boxplot.stats(happiness$Family)
+
+# Complementamos los datos anteriores con el del resumen estadístico.
+summary(happiness$Family)
+```
+Según el boxplot de la variable Family, existe un valor atípico de 0. Así que lo revisamos a continuación.
+
+```{r}
+
+#Obtenemos la fila con el valor 0 en la variable Family, ignorando los NAs.
+happiness[complete.cases(happiness$Family) & happiness$Family==0, c("Country", "Family" )]
+
+```
+Togo es el único país que tiene el valor de 0 en la variable Family, y el boxplot lo cataloga como valor atípico. Por lo tanto, decidimos que en efecto este es un valor atípico y anómalo, por lo que lo convertimos en NA.
+
+```{r}
+# Sustituimos el valor atípico y anómalo de la variable Family por un NA.
+happiness[complete.cases(happiness$Family) & happiness$Family==0, "Family"] <- NA
+
+# Observamos el nuevo valor de Family para el país de Togo.
+happiness[happiness$Country == "Togo", c("Country", "Family")]
+```
+
+# 6. Imputación de valores
+
+```{r}
+str(happiness)
+```
+
+```{r}
+# Observamos las variable numéricas del dataset que contienen algunos valores nulos
+head(happiness[, c("HS", "LCI", "UCI", "GpC", "Family", "LE", "Freedom", "GC", "Generosity")])
+
+# Obtenemos el numero de valores nulos por variable.
+colSums(is.na(happiness[, c("HS", "LCI", "UCI", "GpC", "Family", "LE", "Freedom", "GC", "Generosity")]))
+
+# Observamos los países que tienen valores NA en las variables numéricas.
+happiness[is.na(happiness$HS) | is.na(happiness$Family), c("Country", "HS", "Family")]
+```
+Vemos que la variable HS tiene 15 valores nulos, Family tiene 6 valores nulos y las demás variables tienen 0 valores nulos.
+
+
+```{r}
+# Imputamos en los valores nulos los resultados de aplicar la funcion kNN.
+happiness[, c("HS", "LCI", "UCI", "GpC", "Family", "LE", "Freedom", "GC", "Generosity")] <- kNN(happiness[, c("HS", "LCI", "UCI", "GpC", "Family", "LE", "Freedom", "GC", "Generosity")], k = 11)
+
+# Observamos el dataset actualizado con los datos imputados
+head(happiness[, c("HS", "LCI", "UCI", "GpC", "Family", "LE", "Freedom", "GC", "Generosity")])
+
+# Contamos de nuevo los valores nulos de cada variable numérica
+colSums(is.na(happiness[, c("HS", "LCI", "UCI", "GpC", "Family", "LE", "Freedom", "GC", "Generosity")]))
+```
+El resultado es que cada columna ya no tiene valores NAs. 
+
+Como todos los valores NA han sido imputados, incluido los NA de la variable HS, ahora si podemos crear una secuencia de números en la variable HR que representen los valores de HS.
+
+```{r}
+# Colocamos NA en toda la columna HR
+happiness$HR <- NA_integer_
+
+#Obtenemos la posición/orden de los valores de la variable HS
+rank_HS2 <- rank(happiness$HS, ties.method="first")
+
+#Invertimos los valores de las posiciones/orden para que el mayor sea el primero y viceversa
+reversed_rank_HS2 <- length(happiness$HS) + 1 - rank_HS2
+
+#Colocamos los valores de las posiciones en la variable HR
+happiness[, "HR"] <- reversed_rank_HS2
+
+#Imprimimos para visualizar
+head(happiness[, c("Country", "HR", "HS")], 10)
+```
+Como vemos, después de que los valores NAs de HS han sido imputados basados en kNN, ponemos los valores adecuados para HR basados en los nuevos valores de HS. Por ejemplo, Switzerland, Australia and Sweden tienen el mismo valor de 7.291 en HS, por lo que ocupan las posiciones 8, 9 y 10. Cuando anteriormente Switzerland no tenía ningún valor en HS, por lo tanto habíamos puesto NA tambien en su correspondiente valor de HR.
+
+
+```{r}
+str(happiness)
+```
+
+
+# 7. Estudio descriptivo
+
+## 7.1. Representación gráfica de variables
+
+```{r}
+# Obtenemos la media de cada Region
+df_Region_Freedom <- happiness[, c("Region", "Freedom")] %>% group_by(Region) %>% summarize(mean_freedom=mean(Freedom))
+
+df_Region_Freedom <- df_Region_Freedom[order(df_Region_Freedom$mean_freedom),]
+
+df_Region_Freedom
+```
+
+```{r}
+# Establecemos las medidas de los margenes del barplot.
+par(mar=c(13, 7, 1.5, 6) + 0.1)
+
+# Creamos el barplot
+barplot(df_Region_Freedom$mean_freedom, names.arg=df_Region_Freedom$Region, ylab="Mean Freedom", main="Freedom per Region", las=2)
+```
+
+## 7.2. Medidas características
+
+```{r}
+# Obtenemos las medidas de tendencia central robustas y no robustas
+
+#MEAN
+happiness_mean <- colMeans(happiness[, c("HS", "LCI", "UCI", "GpC", "Family", "LE", "Freedom", "GC", "Generosity")])
+
+#MEDIAN
+happiness_median <- apply(happiness[, c("HS", "LCI", "UCI", "GpC", "Family", "LE", "Freedom", "GC", "Generosity")], 2, median)
+
+#TRIMMED MEAN
+happiness_trimmed_mean <- apply(happiness[, c("HS", "LCI", "UCI", "GpC", "Family", "LE", "Freedom", "GC", "Generosity")], 2,function(x) median(x, trim=0.05))
+
+#apply(happiness[, c("HS", "LCI", "UCI", "GpC", "Family", "LE", "Freedom", "GC", "Generosity")], 2, function(x) winsor.mean(x, trim=0.05))
+
+# Creamos un dataframe con las medidas de tendencia central para cada variable.
+df_central_tendency <- data.frame(mean=happiness_mean, median=happiness_median, trimmed_mean=happiness_trimmed_mean)
+```
+
+
+```{r}
+# Creamos una tabla con las medidas de tendencia central para cada variable.
+kable(df_central_tendency)
+```
+
+```{r}
+# Obtenemos las medidas de dispersión de las variables numéricas
+
+#STANDARD DEVIATION
+happiness_sd <- apply(happiness[, c("HS", "LCI", "UCI", "GpC", "Family", "LE", "Freedom", "GC", "Generosity")], 2, sd)
+
+#INTER-QUANTILE RANGE
+happiness_IQR <- apply(happiness[, c("HS", "LCI", "UCI", "GpC", "Family", "LE", "Freedom", "GC", "Generosity")], 2, IQR)
+
+#MEDIAN ABSOLUTE DEVIATION - Desviación absoluta respecto de la mediana (DAM)
+happiness_DAM <- apply(happiness[, c("HS", "LCI", "UCI", "GpC", "Family", "LE", "Freedom", "GC", "Generosity")], 2, mad)
+
+#Creamos un dataframe con las medidas de dispersión.
+df_dispersion <- data.frame(desviacion_estandar=happiness_sd, rango_intercuartilico=happiness_IQR, desviacion_absoluta=happiness_DAM )
+
+#Creamos una tabla con el dataframe recién creado.
+kable(df_dispersion)
+```
+
+# 8. Archivo final
+
+Una vez realizado el preprocesamiento sobre el archivo, guardar el resultado de los datos en un archivo llamado Happiness_clean.csv.
+
+```{r}
+write.csv(happiness, "MartinezErika_Happiness_clean.csv", row.names=FALSE)
+```
+
+
+# 9. Informe Ejecutivo
+
+## 9.1. Presentación de los principales resultados del estudio en una tabla
+
+```{r, echo=FALSE}
+df_informe <- data.frame( 
+  Inicio = c("157 obervaciones, 12 variables, 4 variables cualitativas (chr) y 8 variable cuantitativas (1 int y 7 num)", ""),
+  Paso2 = c("2. NORMALIZACION DE LAS VARIABLES CUANTITATIVAS", ""),
+  Paso2.1 = c("Cambiamos el nombre de algunas variables. De Happiness.Rank a HR, de Happiness.Score a HS, de GDP.por.Capita a GpC, de Life.Expectancy a LE, de Government.Corruption a GC, de Lower.Confidence.Interval a LCI, de Upper.Confidence.Interval a UCI.", ""),
+  Paso2.2 = c("Cambiamos Happiness.Score de tipo de variable character a numeric.", ""),
+  Paso2.3 = c("Eliminamos las comas y puntos de los valores de GpC (Esta es una variable cualitativa por el momento)", ""),
+  Paso2.4 = c("Agregamos un punto después del primer número de GpC, así los valores van del 0 al 1.8.", ""), 
+  Paso2.5 = c("Convertimos la variable GpC de character a numeric.", ""),
+  Paso2.6 = c("Eliminamos los espacios de delante y después de cada país de la variable Country.", ""),
+  Paso2.7 = c("Cambiamos la primera letra de todas las palabras de cada país de minúscula a mayúscula.", ""),
+  Paso3 = c("3. NORMALIZACION DE LAS VARIABLES CUALITATIVAS", ""),
+  Paso3.1 = c("Eliminamos los espacios de delante y después de cada valor de la variable Region.", ""),
+  Paso3.2 = c("Cambiamos la primera letra de todas las palabras de cada región de minúscula a mayúscula.", ""),
+  Paso3.3. = c("Cambiamos el And por and.", "Australia And New Zealand, Latin America And Caribbean, Central And Eastern Europe, Middle East And Northern Africa"),
+  Paso3.4 = c("Dejamos solo un espacio en blanco entre las palabras.", "Middle East And Northern  Afrca"),
+  Paso3.5 = c("Corregimos Afrca por “Africa.", "Middle East And Northern  Afrca, Sub-Saharan  Afrca"),
+  Paso4 = c("4. ESTUDIO DE LA INCONSISTENCIA ENTRE LAS VARIABLES", ""),
+  Paso4.1. = c("Basándonos en los valores de HS, colocamos los valores correspondientes de HR. Así que creamos una secuencia acorde a los valores de HS, evitando los valores NAs de esta variable.", ""),
+  Paso4.2 = c("Obtenemos las 12 filas en donde incorrectamente LCI es mayor a UCI.", "Australia, Mexico, Slovakia, El Salvador, Russia, Belarus, Paraguay, Montenegro, Sri Lanka, Egypt, Zimbabwe, Sudan"),
+  Paso4.3 = c("Para intercambiar los valores incorrectos de LCI a UCI y viceversa, guardamos LCI en una variable temporal.", ""),
+  Paso4.4 = c("Colocamos los valores erróneos de UCI en la columna de LCI.", ""),
+  Paso4.5 = c("Colocamos los valores erróneos de LCI, guardada en la variable temporal, en la columna UCI.", ""),
+  Paso5 = c("5. VALORES ATÍPICOS", ""),
+  Paso5.1 = c("Revisamos las variables HS, GC, Generosity y Family for valores atípicos y anómalos.", ""),
+  Paso5.2 = c("Basado en la información que tenemos, decidimos que las variables HS, GC, Generosity tiene valores atípicos, pero no anómalos que necesiten ser cambiados.", ""),
+  Paso5.3 = c("La variable Family tiene un único valor atípico de 0, perteneciente al país de Togo. Este es un valor anómalo que decidimos cambiarlos por NA.", "Togo"),
+  Paso6 = c("6. IMPUTACIÓN DE VALORES", ""),
+  Paso6.1 = c("Existen 20 países que tienen valores NA en alguna de sus variables cuantitativas. Existen 15 países con NA en la variable HS y 6 países con NA en la variable Family.", "Switzerland, Iceland, Netherlands, Australia, Czech Republic, Malta, Taiwan, Qatar, Venezuela, Nicaragua, Belize, Bolivia, Belarus, Estonia, Cameroon, Sri Lanka, Armenia, Cambodia, Togo, Syria."),
+  Paso6.2 = c("Imputamos en los valores NA los resultados de aplicar la función kNN con 11 vecinos y la distancia Gower, que en este caso es el default.", ""),
+  Paso6.3 = c("Creamos la secuencia adecuada de numeros enteros en HR basados en los valores actualizados de HS.", ""),
+  Final = c("157 obervaciones, 12 variables, 2 variables cualitativas (chr) y 10 variable cuantitativas (1 int y 9 num)", "")
+  )
+
+#Transponemos el dataframe
+df_informe_t = t(df_informe)
+
+#Creamos una tabla
+kable(df_informe_t, col.names = c("Descripción", "Observaciones"))
+```
+
+## 9.2 Resumen estadístico
+
+Incluir una breve explicación de las características estadísticas básicas de cada variable por separado
+
+```{r}
+summary(happiness)
+```
+
+#### Happiness.Score (HS)
+En un rango del 1 al 10 que representa el puntaje de felicidad de cada país, podemos ver que el valor mínimo es 2.905 y el máximo es 7.526, mientras que la media y mediana de todos los países son casi las mismas con el valor de 5.3.
+
+#### Lower.Confidence.Interval (LCI)
+El intervalo de confianza más bajo el cual reprsenta el valor estimado que es probable que incluya el parámetro de población real. Las medidas de LCI por lo tanto son menores que las de HS. Así, el valor mínimo es 2.732, el valor máximo es 7.45, la media es 5.298 y la mediana es 5.267.
+
+#### Upper.Confidence.Interval (UCI)
+El intervalo de confianza más alto contiene los valores probables representativos de las población del puntaje de felicidad. Así que estos son mayores que HS. Así, el valor mínimo es 3.078, el valor máximo es 7.669, la media es 5.482 y la mediana es 5.419. 
+
+#### GDP.per.Capita (GpC)
+El valor de GpC es difícil de interpretar, porque no sabemos la unidad de medida que se utiliza en el dataset. Como vemos el rango va de 0 a 1.82.
+
+#### Family
+Esta variable representa el número de amigos y familiares con los que una persona puede contar. El valor mínimo de uno de los países en el dataset es de 0.1042, el valor máximo es 1.1728, la media es 0.7970 y la mediana 0.8414. Son valores bajos, mostrando poco capital social en los diferentes países.
+
+#### Life.Expectancy (LE)
+Esta variable está en un rango de 0 a 1, por lo que también es difícil de interpretar. Si los valores fueran absolutos en vez de relativos serían más comprensible. Sin embargo, el valor mínimo es 0, el máximo es 0.9528, la media es 0.5576 y la mediana es 0.5966.
+
+#### Freedom
+Suponemos que esta variable tiene un rango de 0 a 10, sin embargo no tenemos la información precisa. El valor mínimo es 0, el máximo es 0.6085, la media 0.3710 y la mediana es 0.3975. Lo cual muestra bajos valores de libertad en la mayoría de países.
+
+#### Government.Corruption (GC)
+No sabemos si los valores van de 0 a 10 o de 0 a 5, existiría un valor anómalo fuera de este último rango. Necesitamos más información para poder interpretar estos datos correctamente. Así, el valor mínimo es 0, el valor máximo es 0.50521, la media es 0.13762 y la mediana es 0.10547. Lo que indica que la mayoría de los países tiene valor muy bajos comparados con el valor máximo.
+
+#### Generosity
+La generosidad parece que se mide de 0 a 10. Siendo el valor mínimo 0, el máximo 0.8197, la media 0.2426 y la mediana 0.2225. Esto nos indica que un valor alto en la variable Generosity es bastante raro, la mayoría son valores bajos. 

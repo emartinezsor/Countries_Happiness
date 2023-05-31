@@ -1,0 +1,500 @@
+---
+title: "PEC2"
+author: "Erika Martínez"
+date: "`r format(Sys.Date(), '%e de %B, %Y')`"
+output:
+  html_document:
+    toc: yes
+  pdf_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1. Estadística descriptiva
+
+En primer lugar, realizamos un análisis descriptivo de algunas variables y de sus valores comparativos entre regiones. Realizaremos un gráfico que compare los valores medios de los factores que pueden influir en la felicidad. Concretamente, queremos visualizar un gráfico que compare la media entre las regiones de las variables GpC, LE, Freedom, Family, GC y Generosity. El gráfico debe mostrar el valor medio de cada variable en cada región. Cada región se representa en un color distinto. Escoged el gráfico o gráficos que mejor visualice(n) esta comparación entre regiones.
+
+Para realizar este apartado podéis usar la función ggplot de la librería gráfica ggplot2. Para realizar el cálculo de la media de las variables en cada región, podéis usar group_by y summarise de la librería dplyr.
+
+Interpretad el gráfico o gráficos brevemente.
+
+
+## 1.1. Cargar las librerías y el archivo de datos
+
+```{r libraries, warning=FALSE, message=FALSE}
+
+# Cargar el paquete ggplot2
+library(ggplot2)
+
+# Cargamos el paquete dplyr
+library(dplyr)
+
+# Cargamos el paquete tidyr
+library(tidyr)
+
+#Cargamos el paquete knitr para hacer tablas
+library(knitr)
+
+```
+
+Cargamos el archivo .csv
+
+```{r read}
+#Leer el fichero Happiness-clean.csv
+happiness <- read.csv("Happiness-clean_Analisis1.csv")
+
+#Observar los primeros valores del dataframe happiness.
+head(happiness)
+```
+## 1.2. Examinar el tipo de datos
+
+```{r}
+#Observar la estructura del fichero "happiness-clean".
+str(happiness) 
+```
+```{r}
+#Resumen estadísticos de los datos
+summary(happiness)
+```
+
+## 1.3. Calcular la media de las variables por Region
+```{r}
+# Media entre las regiones de las variables GpC, LE, Freedom, Family, GC y Generosity
+df_mean_region <- happiness %>%
+  group_by(Region)  %>%
+  summarise(mean_GpC=mean(GpC), mean_LE=mean(LE), mean_Freedom=mean(Freedom), mean_GC=mean(GC), mean_Generosity=mean(Generosity), mean_Family=mean(Family))
+
+df_mean_region
+```
+
+## 1.4. Creamos un gráfico con las medias por cada Region
+```{r}
+#Transformamos el dataframe para crear el grafico de lineas
+df_mean_region_long <- pivot_longer(df_mean_region, cols = c("mean_GpC", "mean_LE", "mean_Freedom", "mean_GC", "mean_Generosity", "mean_Family"), names_to = "variable", values_to = "value")
+
+head(df_mean_region_long, 10)
+```
+
+```{r}
+#Graficamos el dataframe largo
+ggplot(df_mean_region_long, aes(x = factor(variable), y = value, group=Region, color=Region)) +
+  geom_line() +
+  labs(x = "Variables", y = "Mean") +
+  scale_x_discrete(labels = c("Family", "Freedom", "GC", "Generosity", "GpC", "LE"))
+```
+
+Con el gráfico de líneas podemos ver claramente la dispersión de las medias de las variables escogidas por Región. La variable *GpC*, por ejemplo, tiene una dispersión mas amplia entre Regiones que la variable *Freedom*. Australia y Nueva Zelanda tienen los valores más altos en la mayoría de variables, mientras que Sub-Saharan Africa tiende a tener los valores más bajos en la mayoría de variables.
+
+
+# 2. Intervalo de confianza de la esperanza de vida (LE)
+
+Calculad el intervalo de confianza de la variable LE (Life Expectancy) al 95%. Dibujad también un gráfico que muestre la distribución de la variable LE. En ambos casos, considerad todos los países de la muestra.
+
+Interpretad el resultado.
+
+**Nota 1**: No podéis usar funciones que calculen el intervalo de confianza. Sí podéis usar funciones como qt, qnorm, pt, pnorm.
+**Nota 2**: Implementad una función que calcule el intervalo de confianza. Así podréis reutilizarla en el apartado siguiente sin tener que implementarla de nuevo.
+
+```{r}
+IC <- function(var, confidenceLevel) {
+  sd <- sd(var)
+  n <- length(var)
+  SE <- sd / sqrt(n)
+  t <- qt(confidenceLevel, n-1)
+  L <- mean(var) - t*SE
+  U <- mean(var) + t*SE
+  round(c(L,U), 2) 
+}
+
+IC_LE_95 = IC(happiness$LE, 0.95)
+IC_LE_95
+
+#Convertimos la variable en texto para utilizarla despues en el informe
+IC_LE_95_text = as.character(IC_LE_95)
+```
+
+El intervalo de confianza de la variable LE(Life Expentancy) se encuentra entre los valores 0.53 y 0.59. Dado que tenemos un Nivel de Confianza de 95% lo que significa que la probabilidad de que el intervalo de confianza de la muestra contenga el paramétro poblacional es 0.95 y la probabilidad de que no lo contenga es de 0.05. En otras palabras, si tomaramos un número infinito de muestras de nuestra población, en el 95% de los casos, nuestro intervalo de confianza, que mencionamos en un inicio, contiene la media poblacional mu.
+
+Dado que la desviación típica es desconocida, solo tenemos la desviación típica muestral que es una estimación de la poblacional. Así calculamos el error estándar (SE). Debido a que estamos estimando la desviación estándar añadimos errores al cálculo, por esta razón empleamos otra distribución que la desviación normal estándar, la distribución t student. Sin embargo, cuando tenemos los grados de libertad mayores a 30, la distribución t student es casi idéntica a la distribución normal estándar. En nuestro caso, los grados de libertad son 156, por lo que los valores del intervalo de confianza utiliazando la distribución t student son similares si hubieramos utilizado la distribución normal estándar.
+
+```{r}
+#Graficamos la distribución de la variable de Life Expentancy (LE)
+hist(happiness$LE, breaks=20, main="Histogram of Life Expectancy", xlab="Life Expectancy")
+```
+
+La distribución de la variable es relativamente normal. Sin embargo, como sabemos debido al Teorema del Límite Central, podemos calcular los intervalos de confianza incluso si la población no sigue una distribución normal. 
+
+
+# 3. Intervalo de confianza de LE de dos regiones
+Nos preguntamos si LE es significativamente diferente entre África y Europa. Para ello, calculad los intervalos de confianza al 95% entre estas dos “macro-regiones” o continentes. Debéis agrupar todas las regiones de África en una única macro-región “Africa” y realizar lo mismo con las distintas regiones de Europa. La unidad de observación de cada muestra sigue siendo el país. Luego comparad e interpretad los intervalos de confianza de las macro-regiones/continentes. Acompañad el análisis de un gráfico ilustrativo.
+
+En el caso que las diferencias observadas sean significativas al 95%, calculad los intervalos de confianza al 98%. Interpretad los resultados.
+
+**Nota**: usad la función desarrollada en el apartado anterior.
+
+```{r}
+#AFRICA
+
+Africa_LE <- happiness[happiness$Region %in% c("Sub-Saharan Africa", "Middle East and Northern Africa"), c("LE")]
+
+print(paste("El tamaño de la muestra de la esperanza de vida en Africa es:", length(Africa_LE))) 
+```
+
+```{r}
+#EUROPA
+
+Europe_LE <- happiness[happiness$Region %in% c("Central and Eastern Europe", "Western Europe"), c("LE")]
+
+print(paste("El tamaño de la muestra de la esperanza de vida en Africa es:", length(Europe_LE))) 
+```
+
+```{r}
+#Intervalos de confianza de Africa y Europa al 95%
+IC_Africa_LE_95 = IC(Africa_LE, 0.95)
+IC_Africa_LE_95
+
+IC_Europe_LE_95 = IC(Europe_LE, 0.95)
+IC_Europe_LE_95 
+```
+
+Como podemos ver los intervalos de confianza de la esperanza de vida de los dos continentes no se superponen al 95%, esto significa que existe una diferencia estadísticamente significativa entre las esperanzas de vida de los dos continentes. Obervamos que Europa tiene una expectativa de vida mas alta. 
+
+```{r}
+#Intervalos de confianza de Africa y Europa al 98%
+IC_Africa_LE_98 = IC(Africa_LE, 0.98)
+IC_Africa_LE_98
+
+IC_Europe_LE_98 = IC(Europe_LE, 0.98)
+IC_Europe_LE_98
+```
+
+Los intervalos de confianza de la esperanza de vida siguen sin suponerse al 98%, por lo que la conclusión anterior se mantiene.
+
+```{r}
+#Graficación de la variable LE para Africa y Europa
+hAfrica_LE <- hist(Africa_LE, plot=FALSE, breaks=20)
+hEurope_LE <- hist(Europe_LE, plot=FALSE, breaks=20)
+
+plot(hAfrica_LE, col = rgb(0, 0, 1, alpha = 0.5), main="Histogram of Africa and Europe", xlab="Life Expectancy of Africa and Europe")
+plot(hEurope_LE, col = rgb(1, 0, 0, alpha = 0.5), add = TRUE)
+```
+
+
+Los dos histogramas de Europa Y Africa se solapan, lo que indica que los valores de las distribuciones de los dos continentes se solapan.
+
+Es importante tener en cuenta que la significancia estadística y la significancia práctica no son lo mismo. La significancia estadística simplemente significa que es poco probable que una diferencia entre las dos variables haya ocurrido por casualidad. El significado práctico, por otro lado, se refiere a la importancia o relevancia en el mundo real de la diferencia o relación. 
+
+En este caso, es posible que la diferencia en la esperanza de vida entre los dos continentes sea estadísticamente significativa, pero el alcance de la diferencia puede no ser significativo en la práctica. La superposición de los histogramas podría indicar que la diferencia en la esperanza de vida es relativamente pequeña o que existe una variación importante dentro de cada continente.
+
+
+# 4. Contraste de hipótesis sobre la esperanza de vida
+Seguimos estudiando la esperanza de vida entre los continentes de África y Europa. Realizad un contraste de hipótesis para comprobar si la esperanza de vida en Europa es significativamente mayor que en África al 98% de confianza. 
+
+
+## 4.1 Hipótesis nula y alternativa
+Ho = meanA - meanE = 0;      Ha = meanA - meanE < 0
+
+
+## 4.2 Tipo de contraste
+Es un contraste para la media de dos muestras unilateral paramétrico. Debido a que los tamaños de las muestras son mayores a 30, podemos aplicar el Teorema del Límite Central la cual nos indica que la distribución de la media muestral se comporta como una distribución normal estándar cuando es suficientemente grande (n>30). Por lo tanto, es Contraste Paramétrico. Es claramente para dos muestras porque tenemos dos continentes: África y Europa. Es Contraste de Media porque no se establece de otra manera. Y es unilateral, porque el enunciado nos indica que la hipótesis alternativa sería la esperanza de vida en Europa es mayor que en Africa.
+
+
+## 4.3 Cálculos
+Implementad los cálculos necesarios para realizar el contraste, siguiendo el proceso indicado en el apartado anterior. Calculad el valor observado, el valor crítico y el valor p.
+
+**Nota**: No podéis usar funciones que calculen el contraste. Sí podéis usar funciones como qt, qnorm, pt, pnorm.
+
+```{r}
+#Calculamos las varianzas
+var(Africa_LE)
+var(Europe_LE)
+var.test(Africa_LE, Europe_LE)
+```
+
+La hipótesis nula del F-test es que las varianzas de las dos muestras son iguales. Si el valor p es menor que el nivel de significación elegido (normalmente 0,05), rechazamos la hipótesis nula y concluimos que las varianzas no son iguales. Si el valor p es mayor que el nivel de significación, entonces no podemos rechazar la hipótesis nula y concluir que las varianzas son similares.
+
+Por lo tanto, rechazamos la hipótesis nula y concluimos que las varianzas de las muestras de la esperanza de vida de África y Europa no son similares. Así, podemos utilizar la estadística pertinente.
+
+```{r}
+# Medias de las muestras de Africa y Europa
+meanA = mean(Africa_LE)
+meanE = mean(Europe_LE)
+
+#Varianzas de las muestras
+varA = var(Africa_LE)
+varE = var(Europe_LE)
+
+# Tamaño de las muestras
+nA = length(Africa_LE)
+nE = length(Europe_LE)
+
+
+# t-score/Valor Observado
+t = (meanA -meanE)/(sqrt((varA/nA) + (varE/nE)))
+print(paste("Valor Observado/t-score: ", t))
+
+# Grados de libertad
+df = (((varA/nA)+(varE/nE))**2)/ (((1/(nA-1))*((varA/nA)**2)) + ((1/(nE-1))*((varE/nE)**2)))
+print(paste("Degrees of freedom: ", df))
+
+#Valor Crítico. Contraste unilateral de 98%
+valorCriticoAE = qt(0.02, df)
+print(paste("Valor Critico: ", valorCriticoAE))
+
+#Valor p
+valor_p_AE = pt(t, df)
+print(paste("Valor p: ", valor_p_AE))
+```
+
+```{r}
+# t-test en dos muestras
+test <- t.test(Africa_LE, Europe_LE, alternative="less", var.equal=FALSE)
+test$p.value
+
+test
+```
+
+## 4.4 Interpretación
+En función de los resultados obtenidos en el apartado anterior, concluid si podemos aceptar o rechazar las hipótesis planteadas y dad respuesta a la pregunta de investigación.
+
+
+Podemos ver que el *Valor Observado* -10.54 es extremadamente menor que el *Valor Critico* -2.08. La región de aceptación está comprendida [-2.09, infinito), por lo tanto, nos encontramos fuera de la zona de aceptación de la hipótesis nula.
+
+De igual manera el *Valor p* es muy menor al 0.02 (2%) de *nivel de significancia*. Por lo tanto, rechazamos la hipótesis nula. Entonces, se concluye que la esperanza de vida en África es menor que la esperanza de vida en Europa. 
+
+
+
+# 5 Contraste de hipótesis en relación a la familia
+Nos preguntamos ahora si existen diferencias significativas en el valor de Family entre las regiones Southern Asia y Western Europe con un nivel de confianza del 95%. 
+
+
+```{r}
+# Obtenemos los valores de la variable Family de la Region de Southern Asia
+
+SA_Family <- happiness[happiness$Region %in% c("Southern Asia"), c("Family")]
+
+print(paste("El tamaño de la muestra de la Familia en Southern Asia es: ", length(SA_Family))) 
+```
+```{r}
+# Obtenemos los valores de la variable Family de la Region de Western Europe
+
+WE_Family <- happiness[happiness$Region %in% c("Western Europe"), c("Family")]
+
+print(paste("El tamaño de la muestra de la Familia en Western Europe es: ", length(WE_Family))) 
+```
+```{r}
+#Graficación de la variable LE para Africa y Europa
+hist(SA_Family, col = rgb(0, 0, 1, alpha = 0.5), main="Histogram of Southern Asia and Western Europe", xlab="Life Expectancy of Southern Asia and Western Europe")
+hist(WE_Family, col = rgb(1, 0, 0, alpha = 0.5), add = TRUE )
+
+```
+
+
+## 5.1 Hipótesis nula y alternativa
+Ho = meanSA - meanWE = 0;
+Ha = meanSA - meanWE no es igual a 0
+
+## 5.2 Tipo de contraste
+Especificad qué tipo de contraste aplicaréis y su justificación.
+
+El tamaño de las variables no supera las 30 y tampoco se puede visualizar que exista normalidad en la distribución de las regiones estudiadas basandonos en los histogramas. Debido a que el tamaño de la muestra es demasiado pequeño, no aplica el teorema del límite central y las pruebas realizadas no concluyen normalidad, Por lo que se usan tests no paramétricos. 
+
+El enunciado menciona que queremos sabes si entre las dos muestras existen "diferencias significativas". Como no se indica una dirección clara, entonces asumimos que la hipótesis alternativa sería bilateral.
+
+De manera similar, se asume que utilizamos las medias.
+
+Por lo tanto, el tipo de contraste que usamos es para dos muestras sobre las medias no paramétrico y bilateral. 
+
+## 5.3 Aplicación del test
+Aplicad el test para realizar el contraste de hipótesis, según la justificación proporcionada en el apartado anterior. Podéis usar cualquier función de R que resuelva este contraste. No es necesario desarrollar el código.
+
+Para el test utilizaríamos la función de R  wilcox.test().
+
+```{r}
+wilcox.test(SA_Family, WE_Family)
+```
+El valor p es 0.00005067.
+
+## 5.4 Interpretación
+En función de los resultados obtenidos en el apartado anterior, concluid si podemos aceptar o rechazar las hipótesis planteadas y dad respuesta a la pregunta de investigación.
+
+
+Dado que el *Valor p* es muy menor al 0.025 (2.5%) resultado de la mitad del *nivel de significancia* 0.05 (lo dividimos porque es bilateral). Por lo tanto, rechazamos la hipótesis nula. Entonces, se concluye que en efecto existe una diferencia significativa entre el valor de Family de las regiones Southern Asia y Western Europe.
+
+
+## 5.5 Cálculos
+Explicad brevemente cómo se realiza el cómputo del test que habéis aplicado. No es necesario implementar el código.
+
+Lo que realiza el test Wilcoxon es:
+
+1. Une los datos de las dos muestras y ordena las observaciones de menor a mayor. Si dos o más observaciones son iguales, les asigna el promedio de los rangos que habrían recibido. 
+2. Calcula     la suma de los rangos para cada muestra. 
+3. Calcula la estadística de prueba usando la muestra menor entre la suma de los rangos de una muestra y la suma de los rangos de la otra muestra.
+
+
+
+# 6 Contraste de hipótesis sobre la felicidad
+Nos interesa estudiar ahora la felicidad en algunas regiones. Concretamente, nos interesa comparar los países de Asia con los países de África. La pregunta que nos hacemos es si la proporción de países con un valor de felicidad (HS) inferior a 6 es menor en los países de Asia en comparación con los países de África. Para ello, debéis calcular la proporción de países que tiene un valor HS inferior a 6 en cada continente por separado.
+
+Luego, determinad si existen diferencias significativas, según la pregunta planteada, con un nivel de confianza del 95%. Seguid los pasos que se indican a continuación.
+
+```{r}
+# Obtenemos los valores de la variable Happiness Score (HS) que sean menores a 6 de la Region de Asia
+
+Asia_HS <- happiness[happiness$Region %in% c("Eastern Asia", "Southern Asia", "Southeastern Asia"), c("HS")]
+
+print(paste("El tamaño de la muestra de la HS en Asia es: ", length(Asia_HS))) 
+
+Asia_HS_6 <- happiness[happiness$Region %in% c("Eastern Asia", "Southern Asia", "Southeastern Asia") & happiness$HS < 6, c("HS")]
+
+print(paste("El tamaño de la muestra de la HS menores a 6 en Asia es: ", length(Asia_HS_6))) 
+```
+
+```{r}
+# Obtenemos los valores de la variable Happiness Score (HS) que sean menores a 6 de la Region de Asia
+
+Africa_HS <- happiness[happiness$Region %in% c("Middle East and Northern Africa", "Sub-Saharan Africa"), c("HS")]
+
+print(paste("El tamaño de la muestra de la HS en Africa es: ", length(Africa_HS)))
+
+Africa_HS_6 <- happiness[happiness$Region %in% c("Middle East and Northern Africa", "Sub-Saharan Africa") & happiness$HS < 6, c("HS")]
+
+print(paste("El tamaño de la muestra de la HS menores a 6 en Africa es: ", length(Africa_HS_6)))
+```
+
+## 6.1 Hipótesis nula y alternativa
+Ho = pAsia - pAfrica = 0 ;
+Ha = pAsia - pAfrica < 0
+
+
+## 6.2 Test
+Indicad qué tipo de test aplicaréis y su justificación.
+
+Es un contraste de hipótesis de dos muestras, porque comparamos muestras de Asia y Africa. Además, explicitamente la métrica es proporción como menciona el enunciado. Además, es unilateral porque el enunciado indica una dirección en donde la proporción "es menor en los países de Asia en comparación con los países de África". Por lo tanto, el tipo de contraste de hipótesis es de dos muestras unilateral sobre la proporción.
+
+Dado que el tamaño de la muestra de Africa es grande (>30), entonces tiene una distribución aproximadamente normal. Se puede deducir que la variable aleatoria sigue una distribución normal estándar. Por lo tanto utilizamos el valor z.
+
+## 6.3 Cálculo de las proporciones
+Calculad la proporción de países que tiene un valor HS inferior a 6 en cada continente por separado.
+
+```{r}
+# Proporcion de Asia
+pAsia = length(Asia_HS_6)/length(Asia_HS)
+pAsia
+
+# Proporcion de Africa
+pAfrica = length(Africa_HS_6)/length(Africa_HS)
+pAfrica
+```
+
+## 6.4 Desarrollo del contraste
+Implementad un código que calcule este contraste. Mostrad los resultados del test: valor observado, valor p, valor crítico.
+
+**Nota**: No podéis usar funciones ya implementadas en R que devuelvan el resultado de este contraste. Sí podéis usar qnorm, qt, etcétera.
+
+```{r warning=FALSE}
+# Contar el número de éxitos y fracasos en cada muestra
+nAsia <- length(Asia_HS)
+nAfrica <- length(Africa_HS)
+
+successesAsia <- length(Asia_HS_6)
+successesAfrica <- length(Africa_HS_6)
+
+failuresAsia <- nAsia - successesAsia
+failuresAfrica <- nAfrica - successesAfrica
+
+
+
+# Valor Observado HS
+common_p = (successesAsia + successesAfrica)/ (nAsia + nAfrica)
+valorObservado_HS = (pAsia-pAfrica)/(sqrt(common_p*(1-common_p)*(1/nAsia+1/nAfrica)))
+print(paste("Valor Observado: ", valorObservado_HS))
+
+#Valor Crítico. Contraste unilateral de 95%
+valorCritico_HS = qnorm(0.05)
+print(paste("Valor Critico: ", valorCritico_HS))
+
+# Valor p 
+p_value_HS = pnorm(valorObservado_HS)
+print(paste("Valor p: ", p_value_HS))
+
+
+prop.test(x = c(successesAsia, successesAfrica), n = c(nAsia, nAfrica), alternative = "less", correct=FALSE)
+```
+
+## 6.5 Interpretación del test
+Interpretad el resultado del contraste y responded a la pregunta planteada.
+
+Podemos ver que el *Valor Observado* -0.679 es mayor que el *Valor Critico* -1.645. La región de aceptación está comprendida [-1.645, infinito), por lo tanto, nos encontramos dentro de la zona de aceptación de la hipótesis nula.
+
+De igual manera el *Valor p* 0.249 es mayor al 0.05 (5%) de *nivel de significancia*. Por lo tanto, no rechazamos la hipótesis nula. Entonces, se concluye que la proporción de países con un valor de felicidad (HS) inferior a 6 no es menor en los países de Asia en comparación con los países de África.
+
+
+
+# 7 Tabla resumen
+Presentad una tabla con los resultados principales de cada sección: la pregunta de investigación planteada, los valores obtenidos y la conclusión obtenida en cada apartado. La tabla puede tener un formato como el que se muestra a continuación. Esta tabla nos ayuda a tener una visión general y técnica de los resultados del estudio.
+
+```{r, echo=FALSE}
+
+df_informe <- data.frame( 
+  Apartado1 = c("Análisis descriptivo", "Gráfico de líneas comparando las medias de las variables por Región", "Con el gráfico de líneas podemos ver claramente la dispersión de las medias de las variables escogidas por Región. La variable GpC, por ejemplo, tiene una dispersión mas amplia entre Regiones que la variable Freedom. Australia y Nueva Zelanda tienen los valores más altos en la mayoría de variables, mientras que Sub-Saharan Africa tiende a tener los valores más bajos en la mayoría de variables."),
+  
+  Apartado2 = c("IC % de la variable LE (Life Expectancy) al 95%", paste(IC_LE_95_text[1],"-", IC_LE_95_text[2]) , "El intervalo de confianza de la variable LE(Life Expentancy) se encuentra entre los valores 0.53 y 0.59. Dado que tenemos un Nivel de Confianza de 95% lo que significa que la probabilidad de que el intervalo de confianza de la muestra contenga el paramétro poblacional es 0.95 y la probabilidad de que no lo contenga es de 0.05. En otras palabras, si tomaramos un número infinito de muestras de nuestra población, en el 95% de los casos, nuestro intervalo de confianza, que mencionamos en un inicio, contiene la media poblacional mu." ),
+  
+  Apartado3 = c("¿Es Life Expectancy significativamente diferente entre África y Europa utilizando un intervalo de confianza a 95%?", "", "Los intervalos de confianza de la esperanza de vida de los dos continentes no se superponen al 95%, esto significa que existe una diferencia estadísticamente significativa entre las esperanzas de vida de los dos continentes. Obervamos que Europa tiene una expectativa de vida mas alta. Los intervalos de confianza de la esperanza de vida siguen sin suponerse al 98%, por lo que la conclusión anterior se mantiene."),
+  Apartado3.1.1 = c("Africa - Intervalo de confianza 95%", paste(as.character(IC_Africa_LE_95[1]), "-", as.character(IC_Africa_LE_95[2])) , ""),
+  Apartado3.1.2 = c("Africa - Intervalo de confianza 98%", paste(as.character(IC_Africa_LE_98[1]), "-", as.character(IC_Africa_LE_98[2])), ""),
+  Apartado3.2.1 = c("Europa - Intervalo de confianza 95%", paste(as.character(IC_Europe_LE_95[1]), "-", as.character(IC_Europe_LE_95[2])) , ""),
+  Apartado3.2.2 = c("Europa - Intervalo de confianza 98%", paste(as.character(IC_Europe_LE_98[1]), "-", as.character(IC_Europe_LE_98[2])), ""),
+  
+  Apartado4 = c("Contraste de hipótesis para comprobar si la esperanza de vida en Europa es significativamente mayor que en África al 98% de confianza.", paste("Valor Observado:", as.character(round(t, 2)), "; Valor Crítico:", as.character(round(valorCriticoAE, 2)), "; Valor p:", as.character(valor_p_AE)), "Podemos ver que el *Valor Observado* -14.75 es extremadamente menor que el *Valor Critico* -2.09. La región de aceptación está comprendida [-2.09, infinito), por lo tanto, nos encontramos fuera de la zona de aceptación de la hipótesis nula.De igual manera el *Valor p* es muy menor al 0.02 (2%) de *nivel de significancia*. Por lo tanto, rechazamos la hipótesis nula. Entonces, se concluye que la esperanza de vida en África es menor que la esperanza de vida en Europa."),
+  
+  Apartado5 = c("¿Existen diferencias significativas en el valor de Family entre las regiones Southern Asia y Western Europe con un nivel de confianza del 95%?", "El valor p es 0.00005", "Dado que el Valor p es muy menor al 0.025 (2.5%) resultado de la mitad del nivel de significancia 0.05 (lo dividimos porque es bilateral). Por lo tanto, rechazamos la hipótesis nula. Entonces, se concluye que en efecto existe una diferencia significativa entre el valor de Family de las regiones Southern Asia y Western Europe."),
+  
+  Apartado6 = c("¿Es la proporción de países con un valor de felicidad (HS) inferior a 6 es menor en los países de Asia en comparación con los países de África?", paste("Valor Observado:", as.character(round(valorObservado_HS, 2)), "; Valor Crítico:", as.character(round(valorCritico_HS, 2)), "; Valor p:", as.character(round(p_value_HS, 2))), "Podemos ver que el Valor Observado -0.679 es mayor que el Valor Critico -1.645. La región de aceptación está comprendida [-1.645, infinito), por lo tanto, nos encontramos dentro de la zona de aceptación de la hipótesis nula. De igual manera el Valor p 0.249 es mayor al 0.05 (5%) de nivel de significancia. Por lo tanto, no rechazamos la hipótesis nula. Entonces, se concluye que la proporción de países con un valor de felicidad (HS) inferior a 6 no es menor en los países de Asia en comparación con los países de África.")
+  )
+
+#Transponemos el dataframe
+df_informe_t = t(df_informe)
+
+#Creamos una tabla
+kable(df_informe_t, col.names = c("Pregunta", "Resultado (valor observado, crítico, valor p...)", "Conclusión"))
+```
+
+
+# 8 Resumen ejecutivo
+Resumid las conclusiones del estudio para una audiencia no técnica, indicando las respuestas a las preguntas de investigación planteadas. El resumen no debe ocupar más de media página.
+
+**Nota**: esta pregunta trabaja la competencia de comunicación que es muy importante en el rol de analista de datos.
+
+```{r, echo=FALSE}
+
+df_informe2 <- data.frame(
+  Apartado1 = c("Gráfico de líneas comparando las medias de las variables por Región", "Según la dispersión de los promedios de las variables GpC, LE, Freedom, Family, GC y Generosity agrupados por Región. La variable GpC, por ejemplo, tiene valores más dispersos entre Regiones que la variable Freedom. Australia y Nueva Zelanda tienen los valores más altos en la mayoría de variables, mientras que Sub-Saharan Africa tiende a tener los valores más bajos en la mayoría de variables."),
+  
+  Apartado2 = c("Confianza del 95% de la variable LE (Life Expectancy)", "El promedio del valor de esperanza de vida de todo el conjunto de datos se puede encontrar entre 0.53 y 0.59 con un Nivel de Confianza de 95%." ),
+  
+  Apartado3 = c("¿Es Life Expectancy significativamente diferente entre África y Europa con una confianza del 95% y 98%?", "Los intervalos de confianza de la esperanza de vida de los dos continentes no se superponen, lo que significa que existe una diferencia estadísticamente significativa entre las esperanzas de vida de los dos continentes. Por lo tanto, entendemos que Europa tiene una expectativa de vida mas alta. Los intervalos de confianza de la esperanza de vida siguen sin suponerse con una confianza de 98%, por lo que la conclusión anterior se mantiene."),
+  Apartado3.1.1 = c("Africa - Intervalo de confianza 95%", paste(as.character(IC_Africa_LE_95[1]), "-", as.character(IC_Africa_LE_95[2]))),
+  Apartado3.1.2 = c("Africa - Intervalo de confianza 98%", paste(as.character(IC_Africa_LE_98[1]), "-", as.character(IC_Africa_LE_98[2]))),
+  Apartado3.2.1 = c("Europa - Intervalo de confianza 95%", paste(as.character(IC_Europe_LE_95[1]), "-", as.character(IC_Europe_LE_95[2]))),
+  Apartado3.2.2 = c("Europa - Intervalo de confianza 98%", paste(as.character(IC_Europe_LE_98[1]), "-", as.character(IC_Europe_LE_98[2]))),
+  
+  Apartado4 = c("¿Es la esperanza de vida en Europa significativamente mayor que en África con una confianza de 98%.", "Utilizando las estadísticas pertinentes se concluye que la esperanza de vida en África es menor que la esperanza de vida en Europa con una confianza del 98%."),
+  
+  Apartado5 = c("¿Existen diferencias significativas en el valor de Family entre las regiones Southern Asia y Western Europe co una confianza del 95%?", "Utilizando las estadísticas pertinentes, se concluye que en efecto existe una diferencia significativa entre el valor de Family de las regiones Southern Asia y Western Europe."),
+  
+  Apartado6 = c("¿Es la proporción de países con un valor de felicidad (HS) inferior a 6 es menor en los países de Asia en comparación con los países de África?", "Utilizando las estadíticas pertinentes, se concluye que la proporción de países con un valor de felicidad (HS) inferior a 6 no es menor en los países de Asia en comparación con los países de África.")
+  
+)
+
+#Transponemos el dataframe
+df_informe_t2 = t(df_informe2)
+
+#Creamos una tabla
+kable(df_informe_t2, col.names = c("Pregunta", "Conclusión"))
+```
+
